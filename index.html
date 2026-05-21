@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard OFC — SGO3</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0f1a;--bg2:#141626;--bg3:#1c1f35;--bg4:#242840;
+  --accent:#4f6ef7;--accent2:#7c8ff9;--accent3:#1e2d8a;
+  --green:#22c55e;--green-bg:rgba(34,197,94,0.1);
+  --amber:#f59e0b;--amber-bg:rgba(245,158,11,0.1);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
+  --text:#e8eaf6;--text2:#8b92b8;--text3:#555e8a;
+  --border:rgba(79,110,247,0.15);--border2:rgba(79,110,247,0.3);
+  --radius:10px;--radius-lg:14px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.5}
+
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap}
+.topbar-brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;letter-spacing:-.3px}
+.live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+.loading-dot{width:8px;height:8px;background:var(--amber);border-radius:50%;animation:blink 0.8s infinite}
+.error-dot{width:8px;height:8px;background:var(--red);border-radius:50%}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes rotateSvg{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.topbar-right{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--text2)}
+.ts-badge{font-family:'DM Mono',monospace;font-size:11px;color:var(--text3)}
+.auto-badge{font-size:11px;font-family:'DM Mono',monospace}
+.btn-refresh{display:flex;align-items:center;gap:6px;padding:6px 14px;background:var(--accent3);color:var(--accent2);border:1px solid var(--border2);border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
+.btn-refresh:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-refresh:active{transform:scale(.97)}
+.btn-refresh svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5}
+.btn-refresh.spinning svg{animation:rotateSvg .7s linear infinite}
+
+.main{padding:20px 24px;max-width:1400px;margin:0 auto}
+
+/* CONFIG PANEL */
+.cfg-panel{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:20px;margin-bottom:20px}
+.cfg-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.cfg-title svg{width:15px;height:15px;stroke:var(--accent);fill:none;stroke-width:2}
+.cfg-desc{font-size:12px;color:var(--text3);margin-bottom:16px;line-height:1.6}
+.cfg-desc code{background:var(--bg3);padding:1px 6px;border-radius:4px;font-family:'DM Mono',monospace;font-size:11px;color:var(--accent2)}
+.cfg-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.cfg-label{font-size:12px;color:var(--text2);min-width:130px}
+.cfg-input{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:7px 12px;color:var(--text);font-size:12px;font-family:'DM Mono',monospace;flex:1;min-width:200px;max-width:500px;outline:none;transition:border-color .15s}
+.cfg-input:focus{border-color:var(--border2)}
+.cfg-actions{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn-save{padding:8px 20px;background:var(--accent);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.btn-save:hover{opacity:.9}
+.btn-test{padding:8px 16px;background:transparent;color:var(--accent2);border:1px solid var(--border2);border-radius:7px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.btn-test:hover{background:var(--bg3)}
+.cfg-hint{font-size:11px;color:var(--text3);line-height:1.6}
+
+/* STATUS */
+.status-bar{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.status-msg{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:7px}
+.status-msg.error{color:var(--red)}.status-msg.loading{color:var(--amber)}.status-msg.ok{color:var(--green)}
+.status-detail{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;transition:border-color .2s}
+.kpi:hover{border-color:var(--border2)}
+.kpi-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:500;margin-bottom:5px}
+.kpi-value{font-size:24px;font-weight:600;color:var(--text);letter-spacing:-.5px;line-height:1;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.kpi-value.ok{color:var(--green)}.kpi-value.warn{color:var(--amber)}.kpi-value.bad{color:var(--red)}
+.kpi-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+
+/* ONWAY */
+.onway-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-bottom:18px}
+.onway-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;display:flex;align-items:center;gap:14px;transition:border-color .2s}
+.onway-card:hover{border-color:var(--border2)}
+.onway-icon{width:36px;height:36px;border-radius:8px;background:rgba(79,110,247,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.onway-icon svg{width:17px;height:17px;stroke:var(--accent2);fill:none;stroke-width:2}
+.onway-rota{font-size:17px;font-weight:600;color:var(--accent2);letter-spacing:-.2px}
+.onway-vol{font-size:21px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.onway-lbl{font-size:11px;color:var(--text3)}
+.onway-pct{font-size:11px;font-family:'DM Mono',monospace;margin-top:1px}
+.onway-pct.high{color:var(--amber)}.onway-pct.low{color:var(--green)}
+
+/* HORA A HORA */
+.hora-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.hora-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
+.hora-rota{font-size:13px;font-weight:600;color:var(--accent2);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.hora-total{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.hora-bars{display:flex;align-items:flex-end;gap:2px;height:40px}
+.hora-bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;min-height:2px;transition:height .3s}
+.hora-bar.zero{background:var(--bg3)}
+
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:16px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:4px;width:fit-content;flex-wrap:wrap}
+.tab{padding:7px 14px;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);transition:all .15s;display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif}
+.tab:hover{color:var(--text);background:var(--bg3)}
+.tab.active{background:var(--accent);color:#fff}
+.tab svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2}
+
+.section{display:none;animation:fadein .2s ease}
+.section.visible{display:block}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px}
+.card-hdr{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.card-hdr svg{width:14px;height:14px;stroke:var(--accent);fill:none;stroke-width:2}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.grid2{grid-template-columns:1fr}}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+th{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(79,110,247,.05)}
+td.mono{font-family:'DM Mono',monospace;font-size:12px}
+td.bold{font-weight:600;color:var(--accent2)}
+
+.pill{display:inline-block;font-size:10px;font-weight:600;border-radius:6px;padding:2px 8px;font-family:'DM Mono',monospace}
+.pill-ok{background:var(--green-bg);color:var(--green)}
+.pill-warn{background:var(--amber-bg);color:var(--amber)}
+.pill-danger{background:var(--red-bg);color:var(--red)}
+
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-lbl{font-size:12px;color:var(--text2);min-width:70px;text-align:right;font-family:'DM Mono',monospace}
+.bar-bg{flex:1;height:7px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .5s ease}
+.bar-val{font-size:12px;font-weight:500;min-width:44px;color:var(--text2);font-family:'DM Mono',monospace}
+
+.banc-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px}
+.banc-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.banc-ops{font-size:11px;color:var(--text3);margin-bottom:12px}
+.banc-hour{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.banc-hour:last-child{border-bottom:none}
+.banc-hr-lbl{font-size:11px;color:var(--text3)}
+.banc-hr-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--text3)}
+.banc-hr-val.active{color:var(--accent2)}
+
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--text2);margin-top:10px}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+.footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--border);text-align:center;font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="live-dot" id="status-dot"></div>
+    Dashboard OFC — SGO3
+  </div>
+  <div class="topbar-right">
+    <span class="ts-badge" id="ts-badge">—</span>
+    <span class="auto-badge" id="auto-badge" style="color:var(--text3)">auto 5min</span>
+    <button class="btn-refresh" id="btn-refresh" onclick="fetchData()">
+      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      Atualizar
+    </button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- CONFIG PANEL -->
+  <div class="cfg-panel" id="cfg-panel">
+    <div class="cfg-title">
+      <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Configure a URL do Web App
+    </div>
+    <div class="cfg-desc">
+      Cole aqui a URL gerada após publicar o script <code>WebAppOFC.gs</code> no Apps Script.<br>
+      No editor do Apps Script: <strong>Implantar → Nova implantação → Web App → Executar como: Eu → Quem tem acesso: Qualquer pessoa → Implantar</strong>
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-label">URL do Web App</span>
+      <input class="cfg-input" id="cfg-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec">
+    </div>
+    <div class="cfg-row">
+      <span class="cfg-label">Auto-refresh</span>
+      <select class="cfg-input" id="cfg-interval" style="max-width:180px">
+        <option value="60000">1 minuto</option>
+        <option value="300000" selected>5 minutos</option>
+        <option value="600000">10 minutos</option>
+        <option value="0">Desativado</option>
+      </select>
+    </div>
+    <div class="cfg-actions">
+      <button class="btn-save" onclick="saveConfig()">Salvar e conectar</button>
+      <button class="btn-test" onclick="testUrl()">Testar URL ↗</button>
+      <span class="cfg-hint">A URL fica salva no navegador — só precisa configurar uma vez.</span>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <div class="status-msg" id="status-msg">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="currentColor"/></svg>
+      <span id="status-text">Cole a URL do Web App acima para começar</span>
+    </div>
+    <div class="status-detail" id="status-detail"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Volume esperado</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+    <div class="kpi"><div class="kpi-label">Start sorting</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+    <div class="kpi"><div class="kpi-label">Não conteinerizado</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+    <div class="kpi"><div class="kpi-label">Alocados</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+    <div class="kpi"><div class="kpi-label">Carrinhos abertos</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+    <div class="kpi"><div class="kpi-label">Carrinhos fechados</div><div class="kpi-value" style="color:var(--text3)">—</div></div>
+  </div>
+
+  <!-- ON WAY -->
+  <div class="card">
+    <div class="card-hdr">
+      <svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+      On way — pendentes de chegada
+    </div>
+    <div class="onway-grid" id="onway-grid">
+      <div style="color:var(--text3);font-size:12px">Aguardando dados...</div>
+    </div>
+  </div>
+
+  <!-- HORA A HORA -->
+  <div class="card" id="hora-section" style="display:none">
+    <div class="card-hdr">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Sorting hora a hora
+    </div>
+    <div class="hora-grid" id="hora-grid"></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" data-sec="rotas"><svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h12"/></svg>Rotas</button>
+    <button class="tab" data-sec="ilhas"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Ilhas</button>
+    <button class="tab" data-sec="origens"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>Origens</button>
+    <button class="tab" data-sec="bancadas"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Bancadas</button>
+    <button class="tab" data-sec="charts"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Gráficos</button>
+  </div>
+
+  <div id="rotas" class="section visible">
+    <div class="card">
+      <div class="card-hdr"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Progresso por rota</div>
+      <div class="tbl-wrap">
+        <table style="min-width:640px">
+          <colgroup><col style="width:48px"><col style="width:70px"><col style="width:80px"><col style="width:90px"><col style="width:80px"><col style="width:78px"><col style="width:88px"><col style="width:108px"><col style="width:108px"></colgroup>
+          <thead><tr><th>Rota</th><th>Total</th><th>at_station</th><th>No carrinho</th><th>On way</th><th>% Receb.</th><th>% Sorting</th><th>Pesca</th><th>Sorting</th></tr></thead>
+          <tbody id="tbody-rotas"><tr><td colspan="9" style="color:var(--text3);text-align:center;padding:20px">Aguardando dados...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="ilhas" class="section">
+    <div class="card">
+      <div class="card-hdr"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Ilhas ativas</div>
+      <div class="tbl-wrap">
+        <table style="min-width:520px">
+          <colgroup><col style="width:55px"><col style="width:65px"><col style="width:75px"><col style="width:75px"><col style="width:75px"><col style="width:65px"><col style="width:120px"><col style="width:80px"></colgroup>
+          <thead><tr><th>Ilha</th><th>Plan</th><th>Induzido</th><th>Alocado</th><th>On way</th><th>% HR</th><th>Concluído</th><th>Poka Yoke</th></tr></thead>
+          <tbody id="tbody-ilhas"><tr><td colspan="8" style="color:var(--text3);text-align:center;padding:20px">Aguardando dados...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="origens" class="section">
+    <div class="card">
+      <div class="card-hdr"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>Volume por origem</div>
+      <div id="ori-bars"><div style="color:var(--text3);font-size:12px">Aguardando...</div></div>
+    </div>
+  </div>
+
+  <div id="bancadas" class="section">
+    <div class="grid2" id="banc-grid"><div style="color:var(--text3);font-size:12px">Aguardando...</div></div>
+  </div>
+
+  <div id="charts" class="section">
+    <div class="grid2" style="margin-bottom:14px">
+      <div class="card">
+        <div class="card-hdr"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Volume por rota</div>
+        <div style="position:relative;height:280px"><canvas id="chartRotas" role="img" aria-label="Volume por rota">Volume por rota.</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>Distribuição por origem</div>
+        <div style="position:relative;height:200px"><canvas id="chartOri" role="img" aria-label="Distribuição por origem">Origens.</canvas></div>
+        <div class="legend" id="ori-legend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hdr"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Recebimento vs Sorting por rota</div>
+      <div class="legend" style="margin-bottom:10px">
+        <div class="legend-item"><div class="legend-dot" style="background:#4f6ef7"></div>% Recebimento</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>% Sorting</div>
+      </div>
+      <div style="position:relative;height:220px"><canvas id="chartProg" role="img" aria-label="Recebimento vs sorting">Comparação.</canvas></div>
+    </div>
+  </div>
+
+  <div class="footer" id="footer-ts">SGO3 Controle AM · Dashboard OFC · aguardando conexão</div>
+</div>
+
+<script>
+let cfg = {
+  url:      localStorage.getItem('ofc_webapp_url') || '',
+  interval: parseInt(localStorage.getItem('ofc_interval') || '300000')
+};
+let autoTimer = null;
+let lastData = null;
+let chartRotas = null, chartOri = null, chartProg = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cfg-url').value = cfg.url;
+  document.getElementById('cfg-interval').value = String(cfg.interval);
+  if (cfg.url) {
+    document.getElementById('cfg-panel').style.display = 'none';
+    setupAutoRefresh();
+    fetchData();
+  }
+});
+
+function saveConfig() {
+  const url = document.getElementById('cfg-url').value.trim();
+  if (!url || !url.startsWith('https://script.google.com')) {
+    alert('URL inválida. Deve começar com https://script.google.com/macros/s/...');
+    return;
+  }
+  cfg.url      = url;
+  cfg.interval = parseInt(document.getElementById('cfg-interval').value);
+  localStorage.setItem('ofc_webapp_url', cfg.url);
+  localStorage.setItem('ofc_interval',   cfg.interval);
+  document.getElementById('cfg-panel').style.display = 'none';
+  setupAutoRefresh();
+  fetchData();
+}
+
+function testUrl() {
+  const url = document.getElementById('cfg-url').value.trim();
+  if (!url) { alert('Cole a URL primeiro.'); return; }
+  window.open(url, '_blank');
+}
+
+function setupAutoRefresh() {
+  if (autoTimer) clearInterval(autoTimer);
+  const badge = document.getElementById('auto-badge');
+  if (cfg.interval > 0) {
+    autoTimer = setInterval(fetchData, cfg.interval);
+    const mins = cfg.interval / 60000;
+    badge.textContent = 'auto ' + (mins < 1 ? cfg.interval/1000+'s' : mins+'min');
+    badge.style.color = 'var(--green)';
+  } else {
+    badge.textContent = 'auto off';
+    badge.style.color = 'var(--text3)';
+  }
+}
+
+document.querySelector('.tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+  btn.classList.add('active');
+  document.getElementById(btn.dataset.sec).classList.add('visible');
+  if (btn.dataset.sec === 'charts' && lastData) renderCharts(lastData);
+});
+
+async function fetchData() {
+  if (!cfg.url) {
+    setStatus('error', 'URL do Web App não configurada. Cole a URL acima.');
+    document.getElementById('cfg-panel').style.display = 'block';
+    return;
+  }
+  setStatus('loading', 'Buscando dados...');
+  setDot('loading');
+  const btn = document.getElementById('btn-refresh');
+  btn.classList.add('spinning');
+
+  try {
+    const res = await fetch(cfg.url, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    lastData = data;
+    renderAll(data);
+
+    const now = new Date();
+    const ts = now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('ts-badge').textContent = 'atualizado ' + ts;
+    document.getElementById('footer-ts').textContent =
+      'SGO3 Controle AM · Dashboard OFC · ' + now.toLocaleString('pt-BR') +
+      (data.timestamp ? ' · planilha: ' + data.timestamp : '');
+
+    const ilhasAtivas = (data.ilhas||[]).filter(i => i.plan > 0).length;
+    setStatus('ok', `Dados atualizados — ${(data.rotas||[]).length} rotas · ${ilhasAtivas} ilhas ativas · ${(data.origens||[]).length} origens`);
+    setDot('ok');
+  } catch(err) {
+    setStatus('error', 'Erro: ' + err.message);
+    setDot('error');
+    document.getElementById('status-detail').textContent = err.message;
+    document.getElementById('cfg-panel').style.display = 'block';
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+function setDot(s) {
+  document.getElementById('status-dot').className =
+    s==='ok'?'live-dot':s==='loading'?'loading-dot':'error-dot';
+}
+function setStatus(type, msg) {
+  const el = document.getElementById('status-msg');
+  el.className = 'status-msg ' + type;
+  document.getElementById('status-text').textContent = msg;
+}
+
+function renderAll(d) {
+  renderKPIs(d);
+  renderOnWay(d);
+  renderHoraHora(d);
+  renderRotas(d);
+  renderIlhas(d);
+  renderOrigens(d);
+  renderBancadas(d);
+  if (document.getElementById('charts').classList.contains('visible')) renderCharts(d);
+}
+
+function n(v) { return typeof v==='number'?v:(parseFloat(String(v||0).replace(',','.'))||0); }
+function fmt(v) { return n(v).toLocaleString('pt-BR'); }
+
+function renderKPIs(d) {
+  const k = d.kpis || {};
+  const nc = n(k.naoCont), ab = n(k.carrinhoAberto), bx = n(k.carrinhoBaixo), fc = n(k.carrinhoFechado);
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Volume esperado</div><div class="kpi-value">${k.volumeEsperado||'—'}</div><div class="kpi-sub">pacotes</div></div>
+    <div class="kpi"><div class="kpi-label">Start sorting</div><div class="kpi-value">${k.startSorting||'—'}</div><div class="kpi-sub">atualiz. ${k.atualizacao||'—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Não conteinerizado</div><div class="kpi-value ${nc>0?'warn':'ok'}">${fmt(nc)}</div><div class="kpi-sub">${k.valorNaoCont||'—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Alocados</div><div class="kpi-value">${k.alocados||'—'}</div><div class="kpi-sub">induzidos: ${k.induzidos||'—'}</div></div>
+    <div class="kpi"><div class="kpi-label">Carrinhos abertos</div><div class="kpi-value ${ab>10?'warn':'ok'}">${ab}</div><div class="kpi-sub">abaixo 90%: ${bx}</div></div>
+    <div class="kpi"><div class="kpi-label">Carrinhos fechados</div><div class="kpi-value ok">${fc}</div><div class="kpi-sub">encerrados</div></div>
+    ${k.ilhaOfensora?`<div class="kpi"><div class="kpi-label">Ilha ofensora</div><div class="kpi-value bad">${k.ilhaOfensora}</div><div class="kpi-sub">maior atraso</div></div>`:''}
+  `;
+}
+
+function renderOnWay(d) {
+  const grid = document.getElementById('onway-grid');
+  const com = (d.rotas||[]).filter(r => r.onWay > 0).sort((a,b) => b.onWay - a.onWay);
+  if (!com.length) { grid.innerHTML = '<div style="color:var(--text3);font-size:12px">Nenhuma rota com on way pendente.</div>'; return; }
+  grid.innerHTML = com.map(r => {
+    const pct = Math.round(r.onWay / (r.total||1) * 100);
+    return `<div class="onway-card">
+      <div class="onway-icon"><svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v3h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+      <div>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div class="onway-rota">${r.rota}</div>
+          <div class="onway-vol">${fmt(r.onWay)}</div>
+        </div>
+        <div class="onway-lbl">on way · total ${fmt(r.total)}</div>
+        <div class="onway-pct ${pct>70?'high':'low'}">${pct}% do total pendente${r.pesca?' · '+r.pesca:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHoraHora(d) {
+  const hs = (d.horaSorting||[]).filter(h => h.total > 0);
+  const sec = document.getElementById('hora-section');
+  const grid = document.getElementById('hora-grid');
+  if (!hs.length) { sec.style.display='none'; return; }
+  sec.style.display = 'block';
+  const maxH = Math.max(...hs.flatMap(h => h.horas));
+  grid.innerHTML = hs.map(h => {
+    const bars = h.horas.map((v,i) => {
+      const ht = maxH > 0 ? Math.max(Math.round(v/maxH*40), v>0?3:0) : 0;
+      return `<div class="hora-bar ${v===0?'zero':''}" style="height:${ht}px" title="${i}h: ${v}"></div>`;
+    }).join('');
+    return `<div class="hora-card">
+      <div class="hora-rota">${h.rota} <span class="hora-total">${fmt(h.total)} total</span></div>
+      <div class="hora-bars">${bars}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRotas(d) {
+  const tbody = document.getElementById('tbody-rotas');
+  const rotas = (d.rotas||[]).filter(r => r.total > 0);
+  if (!rotas.length) { tbody.innerHTML='<tr><td colspan="9" style="color:var(--text3);text-align:center;padding:20px">Sem dados</td></tr>'; return; }
+  tbody.innerHTML = rotas.map(r => {
+    const s = r.pctSort;
+    const cls = s>=80?'ok':s>=50?'warn':'danger';
+    return `<tr>
+      <td class="bold">${r.rota}</td>
+      <td class="mono">${fmt(r.total)}</td>
+      <td class="mono">${r.atStation}</td>
+      <td class="mono">${fmt(r.noCarrinho)}</td>
+      <td class="mono" style="color:${r.onWay>500?'var(--amber)':'inherit'}">${fmt(r.onWay)}</td>
+      <td>${r.pctReceb.toFixed(0)}%</td>
+      <td><span class="pill pill-${cls}">${s.toFixed(0)}%</span></td>
+      <td style="font-size:11px;color:var(--text2)">${r.pesca||'—'}</td>
+      <td style="font-size:11px;color:var(--text2)">${r.sorting||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderIlhas(d) {
+  const tbody = document.getElementById('tbody-ilhas');
+  const ativas = (d.ilhas||[]).filter(i => i.plan > 0);
+  if (!ativas.length) { tbody.innerHTML='<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:20px">Sem dados</td></tr>'; return; }
+  tbody.innerHTML = ativas.map(il => {
+    const c = il.concluido;
+    const cls = c>=80?'ok':c>=65?'warn':'danger';
+    return `<tr>
+      <td class="bold">${il.ilha}</td>
+      <td class="mono">${il.plan}</td>
+      <td class="mono">${il.induzido}</td>
+      <td class="mono">${il.alocado}</td>
+      <td class="mono">${il.onWay}</td>
+      <td class="mono">${il.pctHr}</td>
+      <td><span class="pill pill-${cls}">${c.toFixed(1)}%</span></td>
+      <td>${il.pokaYoke>0?`<span class="pill pill-danger">${il.pokaYoke}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderOrigens(d) {
+  const wrap = document.getElementById('ori-bars');
+  const ori = d.origens||[];
+  if (!ori.length) { wrap.innerHTML='<div style="color:var(--text3);font-size:12px">Sem dados</div>'; return; }
+  const max = Math.max(...ori.map(o=>o.v||o.plan));
+  wrap.innerHTML = ori.map(o => {
+    const v = o.v||o.plan;
+    const pct = Math.round(v/max*100);
+    return `<div class="bar-row">
+      <span class="bar-lbl">${o.o||o.origem}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <span class="bar-val">${fmt(v)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderBancadas(d) {
+  const grid = document.getElementById('banc-grid');
+  const bancs = d.bancadas||[];
+  if (!bancs.length) { grid.innerHTML='<div style="color:var(--text3);font-size:12px">Sem dados</div>'; return; }
+  grid.innerHTML = bancs.map(b => {
+    const horas = b.horas && b.horas.length ? b.horas : [null,null,null,null];
+    while (horas.length < 4) horas.push(null);
+    return `<div class="banc-card">
+      <div class="banc-title">${b.nome}</div>
+      <div class="banc-ops">${b.ops||''} · ${b.qtd||2} op.</div>
+      ${horas.slice(0,4).map((h,i)=>`
+        <div class="banc-hour">
+          <span class="banc-hr-lbl">${i+1}ª hora</span>
+          <span class="banc-hr-val ${h?'active':''}">${h?fmt(h):'—'}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderCharts(d) {
+  const gc='rgba(255,255,255,0.05)', tc='#555e8a';
+  const tt={ backgroundColor:'#141626', borderColor:'rgba(79,110,247,0.3)', borderWidth:1, titleColor:'#e8eaf6', bodyColor:'#8b92b8' };
+  if (chartRotas) chartRotas.destroy();
+  if (chartOri)   chartOri.destroy();
+  if (chartProg)  chartProg.destroy();
+
+  const rotas = (d.rotas||[]).filter(r=>r.total>0);
+  chartRotas = new Chart(document.getElementById('chartRotas'),{
+    type:'bar', data:{ labels:rotas.map(r=>r.rota),
+      datasets:[{label:'Volume',data:rotas.map(r=>r.total),
+        backgroundColor:rotas.map(r=>r.total>=1000?'#4f6ef7':r.total>=500?'#7c8ff9':'#a5b0fa'),
+        borderRadius:5,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:ctx=>' '+ctx.parsed.y.toLocaleString('pt-BR')+' pacotes'}}},
+      scales:{y:{grid:{color:gc},ticks:{color:tc,font:{size:11}},border:{color:'transparent'}},
+              x:{grid:{display:false},ticks:{color:tc,font:{size:12},autoSkip:false},border:{color:'transparent'}}}}
+  });
+
+  const oriColors=['#4f6ef7','#7c8ff9','#a5b0fa','#3949ab','#283593','#1a237e'];
+  const ori = d.origens||[];
+  const top5=ori.slice(0,5), rest=ori.slice(5).reduce((a,o)=>a+(o.v||o.plan||0),0);
+  const oriL=[...top5.map(o=>o.o||o.origem),...(rest>0?['Outros']:[])];
+  const oriD=[...top5.map(o=>o.v||o.plan||0),...(rest>0?[rest]:[])];
+  const tot=oriD.reduce((a,b)=>a+b,0)||1;
+  chartOri = new Chart(document.getElementById('chartOri'),{
+    type:'doughnut', data:{labels:oriL,datasets:[{data:oriD,backgroundColor:oriColors,borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+      plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:ctx=>` ${ctx.parsed.toLocaleString('pt-BR')} (${Math.round(ctx.parsed/tot*100)}%)`}}}}
+  });
+  document.getElementById('ori-legend').innerHTML = oriL.map((l,i)=>
+    `<div class="legend-item"><div class="legend-dot" style="background:${oriColors[i]}"></div>${l} ${Math.round(oriD[i]/tot*100)}%</div>`).join('');
+
+  chartProg = new Chart(document.getElementById('chartProg'),{
+    type:'bar', data:{labels:rotas.map(r=>r.rota),
+      datasets:[
+        {label:'% Recebimento',data:rotas.map(r=>r.pctReceb),backgroundColor:'#4f6ef7',borderRadius:4,borderSkipped:false},
+        {label:'% Sorting',data:rotas.map(r=>r.pctSort),backgroundColor:'#f59e0b',borderRadius:4,borderSkipped:false}
+      ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{...tt}},
+      scales:{y:{max:100,grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>v+'%'},border:{color:'transparent'}},
+              x:{grid:{display:false},ticks:{color:tc,font:{size:12},autoSkip:false},border:{color:'transparent'}}}}
+  });
+}
+</script>
+</body>
+</html>
